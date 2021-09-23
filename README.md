@@ -5,6 +5,6 @@ This is the capstone case study for the Google Data Analytics Certification prog
 #### The original project is at: 
   * https://www.kaggle.com/emirhanb/google-da-capstone-project-bike-share-analysis/notebook
 
-#### See, "- DATA SOURCES:" section in the .Rmd for the urls of the data used. 
+#### URLs to the data sources may be found at the "- DATA SOURCES:" section in the .Rmd 
 
 
