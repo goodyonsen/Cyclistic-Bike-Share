@@ -1,0 +1,980 @@
+---
+title: An R Markdown document converted from "~/Documents/Google-DA/course8/track-1/kaggle_divvy_versions/kaggle_trip_data_divvy_v4.ipynb"
+output: html_document
+---
+
+---
+title: 'Cyclistic Trip data'
+author: 'Emir Bilim'
+date: "`r format(Sys.time(),'%d %B, %Y')`"
+output:
+ html_document:
+   number_sections: true
+   toc: true
+   fig_width: 7
+   fig_height: 4.5
+   theme: cosmo
+   highlight: tango
+   code_folding: hide
+   
+---
+
+## - INTRODUCTION: 
+### Study background: 
+This is the capstone case study for the **Google Data Analytics Certification program**. 
+Cyclistic is a fictional bike-share company in Chicago. 
+The finance analysts concluded that the annual members are more profitable than the casual riders. 
+
+### Marketing Goal: 
+#### "Maximizing the number of annual memberships" 
+The director of marketing believes the company’s future success depends on maximizing the number of annual memberships. 
+In accordance to that, the marketing analyst team is to design a new marketing strategy to **convert casual riders into annual members**. 
+
+### Business Task:
+#### Testing the Hypothesis: "Members are more profitable" 
+In order to help test the hypothesis, this analysis will focus on to find an answer to the following question:
+
+   * **"How do annual members and casual riders use Cyclistic bikes differently?"**
+
+## - DATA SOURCES:
+1. [divvy-tripdata 202105, 202106, divvy2019_q4](https://divvy-tripdata.s3.amazonaws.com/index.html)
+2. [Kaggle page for Google DA capstone datasets 202006-202104](https://www.kaggle.com/kevinvenza/cyclistic-bike-share)
+
+```{r}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+```
+
+### Loading the necessary libraries:
+* "**pacman**" package loads the library has it already been installed, or otherwise first installs the package with the required dependencies and then loads the library. 
+
+```{r}
+install.packages("pacman")
+library("pacman")
+
+p_load(tidyverse, dplyr, lubridate, ggplot2, ggrepel, sf, ggmap, 
+       plotly, mapview, leaflet, ggrepel, scales, dplyr, formattable, 
+       skimr, janitor, htmlwidgets, IRdisplay, htmltools)
+```
+
+## A - COLLECTING DATA: 
+### A1) Importing from sources: 
+* Below is the import of the previously downloaded 2 CSV files from the local computer and 11 datasets from the aforementioned Kaggle datasources. 
+
+```{r}
+tripdata_202006 <- read_csv("../input/cyclistic-bike-share/202006-divvy-tripdata.csv")
+tripdata_202007 <- read_csv("../input/cyclistic-bike-share/202007-divvy-tripdata.csv")
+tripdata_202008 <- read_csv("../input/cyclistic-bike-share/202008-divvy-tripdata.csv")
+tripdata_202009 <- read_csv("../input/cyclistic-bike-share/202009-divvy-tripdata.csv")
+tripdata_202010 <- read_csv("../input/cyclistic-bike-share/202010-divvy-tripdata.csv")
+tripdata_202011 <- read_csv("../input/cyclistic-bike-share/202011-divvy-tripdata.csv")
+tripdata_202012 <- read_csv("../input/cyclistic-bike-share/202012-divvy-tripdata.csv")
+tripdata_202101 <- read_csv("../input/cyclistic-bike-share/202101-divvy-tripdata.csv")
+tripdata_202102 <- read_csv("../input/cyclistic-bike-share/202102-divvy-tripdata.csv")
+tripdata_202103 <- read_csv("../input/cyclistic-bike-share/202103-divvy-tripdata.csv")
+tripdata_202104 <- read_csv("../input/cyclistic-bike-share/202104-divvy-tripdata.csv")
+tripdata_202105 <- read_csv("../input/202105divvytripdatacsv/202105-divvy-tripdata.csv")
+tripdata_202106 <- read_csv("../input/202106divvytripdayacsv/202106-divvy-tripdata.csv")
+```
+
+### A2) Checking the structures of all data sets: 
+* This chunk is necessary to make sure the variable types are consistent with the observations. 
+
+```{r}
+str(tripdata_202006)
+str(tripdata_202007)
+str(tripdata_202008)
+str(tripdata_202009)
+str(tripdata_202010)
+str(tripdata_202011)
+str(tripdata_202012)
+str(tripdata_202101)
+str(tripdata_202102)
+str(tripdata_202103)
+str(tripdata_202104)
+str(tripdata_202105)
+str(tripdata_202106)
+```
+
+## B - ORGANIZING DATA:
+### B1) Importing and processing the "divvy2019_q4" data set:
+- After having run the above *str()* chunk and had a thorough check on the outputs of each data set, it was realized that the "*start_station_id*" and "*end_station_id*" columns were differing from each other from "**tripdata_202011**" data set on all the way down to the earliest dated data sets.
+
+- In other words, these 2 columns are "**chr**" datatypes in all data sets starting from "**tripdata_202012**" to "**tripdata_202106**" (including the latter), and they are "**num**" datatypes for the rest, starting from the "**tripdata_202011**" to "**tripdata_202006**" (including the latter)
+
+- Therefore, in order to determine which datatype of the stated columns should be mutated to in the entire 13 datasets, a consideration of taking Mr Hartman's conversion scripts for the relevant columns as benchmark seems fair.
+
+#### How the benchmark was created: 
+* Q4-2019 data was downloaded,
+* *colnames()* and *str()* functions were used for the data set, 
+* "*from_station_id*" and "*to_station_id*" columns, which are equivalents of "*start_station_id*" and "*end_station_id*" in tripdata data sets respectively, were checked to see what data types they are.
+* "*start_station_id*" and "*end_station_id*" columns were fixed accordingly by using the *mutate()* function. 
+* Finally the *str()* function for all tripdata data sets were used again to make sure all datatypes are identical
+
+##### ***Note: The process has already been done once; no need to run the chunk below***
+
+```{r}
+#divvy2019_Q4 <- read.csv("~/Documents/Google-DA/course8/track-1/tripdata/Divvy_Trips_2019_Q4.csv")
+#colnames(divvy2019_Q4) 
+#str(divvy2019_Q4)
+```
+
+#### Processing the information gathered from the output of str(divvy2019_Q4) above for the said columns of the "divvy2019_Q4" dataset:
+
+* "*from_station_id*": **int**
+* "*to_station_id*": **int**
+* Mr Hartman in his script, converts these into "**char**"s for consistency before stacking all up into 1 data frame. 
+* Below is his code I will use later as template for mutating tripdata data sets accordingly:  
+
+##### ***Note: The process has already been done once; no need to run the chunk below.***
+
+```{r}
+# Mr Hartman's code: 
+#q4_2019 <- mutate(q4_2019, ride_id = as.character(ride_id), 
+#                  rideable_type = as.character(rideable_type))
+```
+
+### B2) Conversion of the tripdata columns from 202006 to 202011 datasets: 
+- Converting the "*start_station_id*" and "*end_station_id*" columns from numeric to character for making it possible to merge all 13 data sets into one data frame:
+
+```{r}
+tripdata_202006 <- mutate(tripdata_202006, start_station_id = as.character(start_station_id), 
+                          end_station_id = as.character(end_station_id))
+tripdata_202007 <- mutate(tripdata_202007, start_station_id = as.character(start_station_id), 
+                          end_station_id = as.character(end_station_id))
+tripdata_202008 <- mutate(tripdata_202008, start_station_id = as.character(start_station_id), 
+                          end_station_id = as.character(end_station_id))
+tripdata_202009 <- mutate(tripdata_202009, start_station_id = as.character(start_station_id), 
+                          end_station_id = as.character(end_station_id))
+tripdata_202010 <- mutate(tripdata_202010, start_station_id = as.character(start_station_id), 
+                          end_station_id = as.character(end_station_id))
+tripdata_202011 <- mutate(tripdata_202011, start_station_id = as.character(start_station_id), 
+                     end_station_id = as.character(end_station_id))
+```
+
+### B3) Checking datatypes:
+* Checking the datatypes of the converted columns to see if there are inconsistencies:
+
+```{r}
+str(tripdata_202006)
+str(tripdata_202007)
+str(tripdata_202008)
+str(tripdata_202009)
+str(tripdata_202010)
+str(tripdata_202011)
+```
+
+### B4) Creating single data frame by merging all 13 data sets:
+
+```{r}
+all_trips <- bind_rows(tripdata_202006,
+                       tripdata_202007,
+                       tripdata_202008,
+                       tripdata_202009,
+                       tripdata_202010,
+                       tripdata_202011,
+                       tripdata_202012,
+                       tripdata_202101,
+                       tripdata_202102,
+                       tripdata_202103,
+                       tripdata_202104,
+                       tripdata_202105,
+                       tripdata_202106)
+```
+
+### B5) Inspecting and viewing the entirety of the new data frame (all_trips)
+
+```{r}
+colnames(all_trips) # column names 
+dim(all_trips)  # number of rows and number of columns
+head(all_trips) # viewing first 6 rows as tibble
+str(all_trips) # viewing the datatypes
+summary(all_trips) # statistical summary of the columns
+
+# View(all_trips)
+```
+
+### B6) Checking observations under each user type: 
+* The code chunk below reveals that there are 635,082 more annual **member** activity is recorded in the data frame as a whole than the **casuals**. 
+
+* But this alone is not enough to conclude that **members** are more profitable than the **casuals**.
+
+```{r}
+count(all_trips, member_casual)
+```
+
+### B7) Adding separate columns: 
+* Adding columns for *date*, *month*, *day*, and *year* of each ride to make things easier in the analysis as we may need to see how **members** and **casuals** differ in months, weekdays, ride lengths, etc:
+
+```{r}
+all_trips$date <- as.Date(all_trips$started_at) # "date" column in yyyy-mm-dd format
+all_trips$month <- format(as.Date(all_trips$date), "%m") # "month" column
+all_trips$day <- format(as.Date(all_trips$date), "%d") # "day" column
+all_trips$year <- format(as.Date(all_trips$date), "%Y") # "year" column 
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A") # "day of week" column
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at) # "ride_length" column
+str(all_trips)
+# View(all_trips)
+```
+
+### B8) Converting "*ride_length*" from factor to numeric:
+* The conversion is done for being able to run calculations on the data.
+
+```{r}
+is.factor(all_trips$ride_length) # output is FALSE
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length)) # conversion line
+is.numeric(all_trips$ride_length) # output is TRUE 
+```
+
+## C - CLEANING DATA:
+### C1) Deleting unwanted data:
+* According to the information provided by Mr Hartmans analysis on "**Divvy_Trips_2019**" for "3 quarters" and the "**Divvy_Trips_2020_Q1**", the bikes were taken out of their docks for quality check by Divvy personnel. 
+
+* Therefore the "*ride_length*" column contains negative values and some strings that are not supposed to be there. 
+
+* In order to clean these, "HQ QR" in column "*start_station_name*" and the negative numerics in the "*ride_length*" column are targeted whilst assigning the process to a new data frame (all_trips_v2):
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$start_station_name == "HQ QR" | all_trips$ride_length<0),]
+```
+
+### C2) Handling the missing values (NAs): 
+#### C2-i) Checking if there are missing(NA) values in both of the dataframes: 
+
+```{r}
+anyNA(all_trips) # output: [1] TRUE
+anyNA(all_trips_v2) # output: [1] TRUE
+```
+
+#### C2-ii) Calculating sums and percentages of NAs by columns in both of the data frames:
+
+```{r}
+sum(comma(is.na(all_trips), format = "d")) # sum of NA values in all_trips: 1.207.885
+sum(comma(is.na(all_trips_v2), format = "d")) # sum of NA values in all_trips_v2: 5.675.082
+mean(is.na(all_trips)) # percentage of NA in all_trips: 1.3%
+mean(is.na(all_trips_v2)) # percentage of NA in all_trips_v2: 6.2%
+```
+
+```{r}
+# Also checking the NA percentages "per column" in each data frame by the below function:
+p <- function(x) {sum(is.na(x))/length(x)}
+apply(all_trips, 2, p)
+apply(all_trips_v2, 2, p)
+```
+
+#### C2-iii) Detailed missing value analysis for both data frames:
+
+```{r}
+# all_trips: 
+skim_without_charts(all_trips)
+
+# all_trips_v2:
+skim_without_charts(all_trips_v2)
+```
+
+#### What the output of the above "*skim_without_charts(all_trips_v2)*" tells:
+-   **Number of missing values in each column**: 
+  282,018 in each of the 17 and 287,747 in 2 (*end_lat* & *end_lng*)
+-   **Complete_rate**: 
+  Closer to 1 is a good sign for large data frames.
+Although the complete rates for all columns are greater than 0.9 (90%) this may not be a sufficient rate for some of the analysis.
+-   **Empty**: 
+  number of blank cells. zero for all char columns (11 in total)
+-   **Whitespace**: 
+  this is zero for all char type columns (11 column in total)
+-   **Unique**: 
+  number of unique values in each column. and many more useful stats.
+  
+##### As a result, since a lot of NAs have been added to each column in the new *all_trips_v2* dataframe, removing them lets the data be more consistent for future analysis.
+
+### C3) Filtering out the missing values (NA):
+* Below is the filtering process of the **NAs** in "*all_trips_v2*" data frame, and assigning the resulting complete cases to a new data frame. 
+
+* What has also been realized here is about 300 "0"(zero) ride length values in the "*ride_lengths*" column. So, it is better to remove them as well
+
+```{r}
+# Removing NAs from all_trips_v2 and creating a clean dataframe:
+all_trips_v3 <- all_trips_v2 %>%
+  filter(complete.cases(all_trips_v2))
+
+# Removing the zero ride lengths from "ride_lengths" column:
+all_trips_v3 <- all_trips_v3[!(all_trips_v3$ride_length <= 0),]
+
+# skim w/o charts reveals no missing values (NA) and 1 complete rate:
+skim_without_charts(all_trips_v3)  
+
+#head(all_trips_v3)
+```
+
+## D - ANALYSIS:
+### D1) Descriptive analysis on ride length
+#### The code below gives useful information:  
+* The **duration()** function helps making the outputs easier to read but the original data is still kept in seconds format for this particular column.
+
+* Once the "negatives" and "zero values" were removed from the "*ride_length*" column, the new minimum ride length is now **1 second**, while the maximum is **5.55 weeks** (or 3,356,649 seconds). 
+
+* This may mean that a user might have grabbed a bike and have not returned it before 5.55 weeks. There may also be numerous occasions of this kind, which could be useful to know.
+
+* The **median ride length** for both user types is **14 minutes and 18 seconds**, which defines that half of the ride lengths for each user activity is (regardless of their membership status) below 14 minutes and 18 seconds.
+
+* The **average ride length** for all user types is about **27 minutes**.
+
+```{r}
+basic_stats <- all_trips_v3 %>%
+  summarize(average_ride_length = duration(mean(ride_length)), 
+            max_ride_length = duration(max(ride_length)), 
+            min_ride_length = duration(min(ride_length)), 
+            median_ride_length = duration(median(ride_length)))
+
+tibble(basic_stats)
+```
+
+### D2) Comparing the basic stats for members and casual users 
+* In the below code, the *duration()* function is of no help creating comparison tibbles for the user types. 
+
+* So the values are kept in seconds but formatted as separated by *comma* to make them more human readable.
+
+```{r}
+ride_length_seconds <- comma(all_trips_v3$ride_length, format = "d")
+
+aggregate(ride_length_seconds ~ member_casual, data = all_trips_v3, mean) 
+# average ride length in seconds, of a casual user:
+aggregate(ride_length_seconds ~ member_casual, data = all_trips_v3, median)
+aggregate(ride_length_seconds ~ member_casual, data = all_trips_v3, min)
+aggregate(ride_length_seconds ~ member_casual, data = all_trips_v3, max)
+```
+
+### D3) Comparing "number of rides" taken by each user type to their "average ride durations" on "**weekends**":
+* The *Frequency* column in the below code shows the **casuals** are more frequent riders in terms of the "count" of rides on "weekends", and "their average duration" of rides are much higher than the **members**.
+
+* It is clear that the "**casuals**" not just have used the bikes more than the **members** on weekends, but their *average ride duration* is more than double the **members'** 
+
+* The output of the chunk below presents there are roughly 104.000 (~7%) more rides taken by **casuals** on "weekends" than **members**
+
+```{r}
+day_check <- all_trips_v3 %>% 
+  select(day_of_week, member_casual, ride_length) %>% 
+  group_by(member_casual) %>% 
+  filter(day_of_week == "Saturday" | day_of_week == "Sunday") %>% 
+  summarize(Number_of_rides = comma(n(), format = "d"),
+            average_duration = duration(mean(ride_length))) %>%
+  mutate(Frequency = percent(Number_of_rides/sum(Number_of_rides)))
+
+day_check
+```
+
+### D4) Comparing total number of rides taken by members to casual users on weekdays:
+* Unlike the output of the *weekend* data above, the *weekdays* chunk below shows the **members** are clearly more active in *weekdays*. 
+
+* Nevertheless, their *average duration* is still behind more than half of average duration of the **casuals**.
+
+* The *Frequency* column puts that the **members** are more frequent riders in terms of the "count" of "ride lengths" for each weekday, yet their* average duration* of rides are much "lower" than the **casuals**. 
+
+* The chunk below indicates that roughly 704.000(~24%) more bike rides have been taken by "**members**" on weekdays.
+
+```{r}
+weekday_check <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+stat_weekday <- all_trips_v3 %>% 
+  select(day_of_week, member_casual, ride_length) %>% 
+  group_by(member_casual) %>% 
+  filter(day_of_week %in% weekday_check) %>% 
+  summarize(Number_of_rides = comma(n(), format = "d"),
+            average_duration = duration(mean(ride_length))) %>%
+  mutate(Frequency = percent(Number_of_rides/sum(Number_of_rides)))
+
+stat_weekday
+```
+
+### D5) The difference between weekends and weekdays number of rides by user type:
+#### The below code chunk makes clear that; 
+* Both **members** and **casuals** use the bikes more on the "*weekdays*": 
+  * The margin of the *weekend* - *weekday* use of bikes for the **members** (1,092,204) is almost 4 folds (3.8) of the margin for the **casuals** (283,504).
+  
+  
+* The gap in the *average duration*, which indicates that the **members** are short in average duration by more than double the value the **casuals** reached, is still there.
+
+* This may point to a possibility that at least a portion of the total *average duration* spent with the bikes by the **casuals** may not be a significant determinant for concluding that they are more active riders. 
+
+```{r}
+week_days <- stat_weekday$Number_of_rides
+# member:1,785,313 , casual:1,081,289
+
+weekends  <- day_check$Number_of_rides 
+# member:693,109 , casual:797,785
+
+activity_diff <- week_days-weekends
+
+tibble(activity_diff) 
+# casual:283,504 
+# member:1,092,204
+```
+
+### D6) Significance of ride lengths for determining the top routes:
+#### D6-i) Logic for setting criteria for workhours in weekdays:
+* Many of the top ride lengths for the **casuals** might actually be "single time riders". 
+
+* This in turn may mean that the peak duration spent with the bikes are inconsistent with the frequency of real bike usage, while it may be consistent with the Frequency columns above. 
+
+* As the number of rides figures in section "**D4**" above make it clear that there are more user activity in terms of "number of rides" in weekdays, it makes sense to assume most of the trips have been taken to/from work places.
+
+* Therefore, average length of daily weekday working hours are taken into account to make a relevantly significant estimate about the number of bike rides that are not part of the daily trips to work.
+
+* A portion of ride lengths is likely to include duration that bikes are actually not ridden, which means the bikes are immobile despite they are rented/in-use.  
+
+* So, 2 hours of total "real trip duration" and a total of "at least" 8 hours of bike immobility is estimated (10 hours = 36000 seconds)
+
+* Since the interest is in the "single time long travels", the count of such criteria should be equal to 1
+
+* The output of below code -which will later be used for a basic visualization- shows that there are total of **6481** occasions "meeting the criteria", in which the number of **casuals** are 11 times *greater* than of the **members**.
+
+```{r}
+min_rides <- all_trips_v3 %>% 
+  group_by(rideable_type, ride_length, member_casual) %>%
+  summarize(count = comma(n(), format = "d"), 
+            ride_length = comma(ride_length, format = "d")) %>% 
+  filter(ride_length > 36000 & count == 1) %>%
+  group_by(rideable_type, member_casual) %>% 
+  summarize(count = comma(n(), format = "d")) %>% 
+  arrange(-count, member_casual) %>% 
+  adorn_totals("row")
+
+tibble(min_rides)
+```
+
+#### D6-ii) Checking how many rides are left out of the criteria:
+* As the below chunk shows the significance of the above criteria is low. 
+
+* Reason for that is the output displays a sum for more than *4.3 million counts* with exact same groupings when there is "no criteria" (the count of long rides greater than 36000 seconds being equal to 1).  
+
+* Although the sum includes all 3 bike types, the electric bikes are neither convinient for long rides, nor is their sum (~700,000) greater than the sums of the other 2 bike types by a margin big enough to give a significance to the counts in the above chunk.    
+
+* Therefore ride lengths are "likely" to be a significant factor for the **most used routes**.
+
+```{r}
+min_rides2 <- all_trips_v3 %>% 
+  group_by(rideable_type, ride_length, member_casual) %>%
+  summarize(count = comma(n(), format = "d"), 
+            ride_length = comma(ride_length, format = "d")) %>% 
+  group_by(rideable_type, member_casual) %>% 
+  summarize(count = comma(n(), format = "d")) %>% 
+  arrange(-count, member_casual, rideable_type) %>% 
+  adorn_totals("row")
+
+tibble(min_rides2)
+```
+
+### D7) Putting the days of the week into an order:
+
+```{r}
+all_trips_v3$day_of_week <- ordered(all_trips_v3$day_of_week, 
+                                    levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+### D8) Comparing average ride time of **members** to **casuals** by each day:
+* The **members** are also behind in "average daily ride length" statistics (in seconds)
+
+```{r}
+ride_length_seconds <- comma(all_trips_v3$ride_length, format = "d")
+
+av_ride_time <- aggregate(ride_length_seconds ~ member_casual + 
+                            day_of_week, data = all_trips_v3, mean) %>% 
+  arrange(-ride_length_seconds, member_casual)
+av_ride_time
+```
+
+### D9) Analyzing ridership data by user type and weekday:
+* The output below shows that "the average duration" of the "maximum number of rides" taken by "the **members**" is less than "the double of the average duration" of the "minimum number of rides" taken by "the **casuals**". 
+
+* Moreover, the **casuals** made this "minimum" figure on a Tuesday (a workday), while the compared maximum number of rides for the **members** was reached on Sunday. 
+
+* The **casuals** are in fact behind the **members** in "number of rides" total by a great margin (599,348)
+
+* However the **members** are also behind the **casuals** in "average duration"
+
+```{r}
+ridership <- all_trips_v3 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>%  #creates weekday field using wday()
+  group_by(member_casual, weekday) %>%  #groups by user type and weekday
+  summarise(number_of_rides = comma(n(), format = "d"),
+            average_duration = duration(mean(ride_length))) %>%
+  arrange(-average_duration) # sorting to see the longest average duration
+ridership
+```
+
+## E - VISUALIZATIONS:
+
+### E1) Visualization of number of rides by user type:
+* The below chart is based on the script document Mr Kevin Hartman provided as guide for the project.
+
+* The only 2 modifications done on this chart are:
+  * The use of cleaned data (all_trips_v3) that has no missing values,
+  * Formatted scientific values on the y-axis to make them more readable
+
+```{r}
+all_trips_v3 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(number_of_rides = comma(n(), format = "d"),
+            average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(label = comma)
+```
+
+### E2) Visualization of weekday analysis:
+* Below chart shows the number of rides taken by the *users*, as well as their average duration, by *each day of the week*. 
+
+* The *circle* data points marked with violetred are representing **casual** users and the *triangle* shaped black points represent **members**.
+
+* Their size differ by *their average ride duration*; greater the size, longer the duration.
+
+* As there are only 7 data points for each user type, and their average duration are in narrow ranges, the sizes of data points may seem unchanged. 
+
+* For this reason, average ride duration in "**minutes**" is also marks each data point to make them easier to read. The *legend* for *average duration* shows sizes in terms of "**seconds**". 
+
+* The blue dashed lines show the differences between two user types by "*number of ride*" figures; longer the lines, greater the gap in number of rides. 
+
+* The chart is consistent with the results in chunks of sections **D3** and **D4**; both user types are more active on weekends(Saturday and Sunday), in "number of rides".  
+
+#### Analysis of the visual: 
+
+* **Casuals**: 
+  * While they tend to use more bikes (number of rides) for much longer (average ride duration) on *weekends*, their ride numbers dramatically change between "Mondays" and "Thursdays". 
+  * Even though they have lower frequency in *number of rides* during weekends, they still have much greater figures in *average ride duration* (see **D3** and **D4**) 
+  
+* **Members**: 
+  * They lead the number of rides in "5 days" of the week (except Sunday and Saturday) 
+  * They are far behind the **casuals** in *ride duration* in each day of the week. 
+  * On the flip side, they are much more active than **casuals** between Monday and Friday. 
+  * It is worth to note that the blue lines representing the gaps in terms of "*number of rides*" on *Sundays* and *Saturdays*, are actually much *shorter* than the gaps in days favoring **members** 
+
+```{r}
+wday_viz <- all_trips_v3 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+ summarize(number_of_rides = comma(n(), format = "d"),
+            average_duration = comma(mean(ride_length), format ="d"),
+            minutes_col = comma((mean(ride_length)/60), format = "d")) %>% 
+  arrange(-average_duration, number_of_rides)
+
+#tibble(wday_viz)
+
+p <- ggplot(wday_viz, aes(x = weekday, y = number_of_rides)) +
+  geom_point(aes(color = member_casual, shape = member_casual, 
+                 size = average_duration)) +
+  geom_text(
+    aes(label = minutes_col), 
+    size = 3.18, color = "grey40",
+    fontface = "bold.italic",
+    check_overlap = TRUE,
+    position = position_dodge(0.9), 
+    vjust = 0, hjust = -0.27) +
+  scale_color_manual(name = "User Types (color)",
+                     values = c("casual" = "violetred", "member" = "black"),
+                     labels = c("casual" = "Casual Users","member" = "Members")) +
+  scale_shape_discrete(name = "User Types (shape)",
+                       breaks = c("casual", "member"),
+                       labels = c("Casual Users", "Members")) +
+  geom_line(color = "blue", linetype = "twodash") +
+  scale_y_continuous(label = comma) + 
+  labs(title = expression(underline("Cyclistic Data: Weekday Analysis")),
+       subtitle = "Number of bike rides for each day of the week, by 'user type' and 'average ride duration'",
+       y = "Number of Rides", x = "Days", size = "Average Duration (seconds)", 
+       color = "User Type (color)", shape = "User Type (shape)") +
+  theme(axis.text.x = element_text(size = 10, colour = "darkgreen", face = "bold")) +
+  theme(axis.title = element_text(face = "bold", color = "black")) +
+  theme(strip.text.x = element_text(color = "black", face = "bold")) + 
+  theme(panel.background = element_rect(fill = "grey90", colour = "black")) + 
+  theme(plot.title = element_text(color = "black", face = "bold", size = 15)) +
+  theme(plot.subtitle = element_text(color = "black", face = "bold.italic", size = 9)) +
+  theme(legend.key.size = unit(0.5, "cm"))
+
+p + annotate("text", x = "Tue", y = 440000, label = "Average ride duration in 'Minutes'", 
+             color = "darkgreen", fontface ="bold", size = 3.25) + 
+  geom_segment(
+    aes(x = "Tue", y = 425000, xend = "Wed", yend = 390000),
+                  arrow = arrow(length = unit(0.25, "cm")), color = "darkgreen")
+```
+
+### E3) Visualization of number of rides per bike type:
+* Below column chart has 4 different variables grouped to display how *average number of rides* differ by **user types** and **bike types**, in *each day of the week* within the period of 13 months (period the original datasets cover).   
+
+* The main difference from the **E2** chart above is this one also allows extracting insight about how the preferences of **users** for each **bike type** "change" throughout the week, and how frequent these preferences occurred in terms of *number of rides*:
+
+```{r}
+# 1) Passing named vectors to change the text labels of facet_wrap() arguments: 
+panel_labels <- c("classic_bike" = "Classic Bikes", 
+                  "docked_bike" = "Docked Bikes",
+                  "electric_bike" = "Electric Bikes") 
+
+# 2) Creating a new dataframe: 
+bike_type_rides <- all_trips_v3 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday, rideable_type) %>% 
+  summarise(number_of_rides = comma(n(), format = "d"),
+            average_duration = mean(ride_length)) %>%
+  arrange(average_duration, weekday, -number_of_rides) %>%
+  data.frame()
+
+# 3) Plotting the data frame:
+ggplot(bike_type_rides, aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "stack") + 
+  scale_y_continuous(label = comma) + # formatting continuous data numbers
+  facet_wrap(~ rideable_type, labeller = labeller(rideable_type = panel_labels)) +
+  labs(title = expression(underline("Cyclistic Data: Members vs. Casual riders")),
+       subtitle = "Cummulative number of bike rides per 'bike type' in one year, for each day by 'user type'", 
+       caption = "Part of the pipe block written to create this visual was taken from Mr Hartman's work",
+       y = "Number of Rides", x = "Days of week") +
+  theme(axis.text.x = element_text(angle = 45, size = 9, colour = "brown", face = "bold")) +
+  theme(axis.text.y = element_text(size = 8, colour = "black", face = "bold")) +
+  theme(axis.title = element_text(face = "bold", color = "blue")) +
+  theme(strip.text.x = element_text(color = "black", face = "bold")) + 
+  theme(panel.background = element_rect(fill = "grey55", colour = "black")) + 
+  theme(plot.title = element_text(color = "black", face = "bold", size = 15)) +
+  theme(plot.subtitle = element_text(color = "black", face = "bold.italic", size = 9)) +
+  scale_fill_manual(values = c("casual" = "violetred", "member" = "aquamarine"), 
+                    labels = c("casual" = "Casual users","member" = "Members"), 
+                    name = "User Types")
+```
+
+### E4) Visualization of ride length significance:
+* Below bar chart is the illustration of the calculated significance of ride lengths based on the estimations described in section "**D6-i**"
+
+```{r}
+# Re-writing the "D6-i" code without the adorn_totals("row") line for proper visualization:
+
+min_rides <- all_trips_v3 %>% 
+  group_by(rideable_type, ride_length, member_casual) %>%
+  summarize(count = comma(n(), format = "d"), 
+            ride_length = comma(ride_length, format = "d")) %>% 
+  filter(ride_length > 36000 & count == 1) %>%
+  group_by(rideable_type, member_casual) %>% 
+  summarize(count = comma(n(), format = "d")) %>% 
+  arrange(-count, member_casual)
+
+# plotting the chart: 
+
+  ggplot(min_rides,
+       aes(x = rideable_type , y = count, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(label = comma) +
+  labs(title = expression(underline("Single Time Bike Use")),
+       subtitle = "Single time bike use for at least 10 hours by both User and Bike types",
+       y = "Number of Rides", x = "Bike Types") +
+  scale_fill_manual(name = "User Types",
+                     values = c("casual" = "darkred", "member" = "darkgreen"),
+                     labels = c("casual" = "Casual Users","member" = "Members")) +
+  theme(axis.text.x = element_text(size = 10, colour = "black", face = "bold")) +
+  theme(axis.text.y = element_text(size = 10, colour = "black", face = "bold")) +
+  theme(axis.title = element_text(face = "bold", color = "blue")) + 
+  theme(plot.title = element_text(color = "black", face = "bold", size = 15)) +
+  theme(plot.subtitle = element_text(color = "black", face = "bold.italic", size = 9))
+```
+
+### E5) User activity by "**month**": 
+
+* The below visual -and the 58 row dataframe- provide information about **average ride lengths** in "minutes" and "hours" for each **user and bike type** per **month**. 
+
+* **Members** are just few thousand rides (4,864) behind the **casuals** in **electric** bikes when both are at their peak months (**October** and **June** respectively) for that particular bike type.
+
+* Moreover, for the **docked** bikes, **members** took **25,369** more rides at their peak month (**August**) than the **casuals** did at their own peak month (**July**), 
+
+* This gap is the widest in **classic** bike as **Members** took **58,939** more rides than the **casuals** did. June is the peak month for both user types.
+
+* Nevertheless consistent with what the **E2) visual** ("weekday analysis") shows, the **members** spent much less time with the bikes despite having had more ride counts in **classic** and **docked** bikes.
+
+```{r}
+# Checking monthly user activity:
+per_month_df <- all_trips_v3 %>% 
+  mutate(month = month.abb[as.numeric(month)]) %>% 
+  group_by(month, rideable_type, member_casual) %>% 
+  summarize(count = comma(n()),
+            average_ride_length = duration(mean(ride_length))) %>%  
+  arrange(member_casual, rideable_type, -count)
+per_month_df
+
+####  Visualization ####
+
+# 1) Passing named vectors to change the text labels of facet_wrap() arguments: 
+panel_labels <- c("classic_bike" = "Classic Bikes", 
+                  "docked_bike" = "Docked Bikes",
+                  "electric_bike" = "Electric Bikes") 
+
+# 2) Creating a new dataframe for plotting column chart: 
+per_month <- all_trips_v3 %>% 
+  mutate(month = month.abb[as.numeric(month)]) %>% #converting numeric months to their string abbreviations
+  group_by(month, rideable_type, member_casual) %>% 
+  summarize(count = comma(n()),
+            average_ride_length = mean(ride_length)/3600) %>%  
+  #arrange(desc(month), average_ride_length) %>%
+  arrange(member_casual, rideable_type, -count) %>%
+  data.frame()
+
+# 3) Plotting the dataframe:
+ggplot(per_month, 
+       aes(x = average_ride_length, 
+           y = month, 
+           fill = member_casual)) +
+  geom_col(position = "stack", width = 0.7) + 
+  scale_x_continuous(label = comma) +
+  facet_wrap(~ rideable_type, 
+             labeller = labeller(rideable_type = panel_labels)) +
+  labs(title = expression(underline("Cyclistic Data: Members vs. Casual riders")),
+       subtitle = "User activities per 'bike type' by 'average hours' for 'each month'",
+       x = "Average Ride Lengths (hours)", y = "Months") +
+  theme(axis.text.x = element_text(size = 8, 
+                                   colour = "brown", face = "bold")) +
+  theme(axis.text.y = element_text(face = "bold")) +
+  theme(axis.title = element_text(face = "bold", color = "blue")) +
+  theme(strip.text.x = element_text(color = "black", face = "bold")) + 
+  theme(panel.background = element_rect(fill = "grey65", colour = "black")) + 
+  theme(plot.title = element_text(color = "black", face = "bold", size = 15)) +
+  scale_fill_manual(values = c("casual" = "darkblue", "member" = "green"), 
+                    labels = c("casual" = "Casual users","member" = "Members"), 
+                    name = "User Types")
+```
+
+### E6) Visualization of the top destinations on map
+* This process involves a couple steps. 
+    1. Determining the most used routes, 
+    2. Transforming the columns with coordinates to geometric
+
+#### E6-i) Determining the most used destinations: 
+* The below code creates a new dataframe called "**top_destinations**" out of the main "**all_trips_v3**", via grouping certain columns.
+* These columns contains starting and ending coordinates(4 columns in total as 2 for each), and their respective station names (2 columns). 
+* Additionaly, another column called "**count**" is created by summarize function to display numeric occurances of coordinates. 
+* Since there are nearly 900,000 rows matching the below grouping, and that it might be both confusing and time consuming to display all on the map, filtering is necessary. 
+* Thus, filtering destinations with 3000 and more occurances provides top 16 destinations.  
+
+```{r}
+top_destinations <- all_trips_v3 %>% 
+  group_by(start_station_name, end_station_name, 
+           start_lat, start_lng, end_lat, end_lng) %>% 
+  summarize(count = n()) %>% 
+  filter(count >= 3000) %>% 
+  arrange(-count)
+
+tibble(top_destinations)
+```
+
+#### E6-ii) Mapping the top destinations via mapview()
+* Plotting a map often requires transformation of coordinate columns to geometric point columns. This could be done by the use of few different functions of different libraries. Nonetheless, the above chunk would still have 2 starting and 2 ending points, which makes the transformation little complicated than it should be. 
+
+* One approach was to use "**st_as_sf()**" function as shown in the below chunk. Transforming the first couple (*start_lng* and *start_lat*) to geometric points was not a problem. But the second couple would keep adding additional geometric columns unless a separate column was specified for it and **st_geometry()** function was passed into the pipe. 
+
+* Despite all these efforts, the **mapview()** function required additional html widgets to display interactive map on Kaggle notebook. 
+
+* Additionaly, having all 4 coordinate points displayed on one map might make it little problematic to understand what is actually plotted.  
+
+* So it is better to split the coordinates under two separate dataframes as "*top_start_stations*" and "*top_end_stations*" and to plot them as two different maps. This way the top starting and ending stations could be analyzed and inferred from much easier. 
+
+##### ***NOTE***:
+##### *the below chunk is to demonstrate the code that plots a map by the **mapview()** function. It may not produce the map on this notebook but it does in RStudio Desktop.*
+
+```{r}
+# 4326 identifies coordinates are based on the World Geodetic System (WGS84), standard for GPS coordinates.
+
+top_destinations_geom <- top_destinations %>% 
+  st_as_sf(coords = c("start_lng", "start_lat"), crs = 4326)
+
+top_destinations_geom$geometry_ends <- top_destinations %>% 
+  st_as_sf(coords = c("end_lng", "end_lat"), crs = 4326) %>% 
+  st_geometry() 
+
+top_destinations_geom <- top_destinations_geom %>% 
+  select (-c(end_lat, end_lng))
+
+# to see how the geometric columns look like:
+tibble(top_destinations_geom)
+
+# the map:
+mapview(top_destinations_geom)
+
+# Alternatively, dark map: 
+# mapview(top_destinations_geom, color = "magenta", col.regions = "white")
+```
+
+#### E6-iii) Determining the most used "start stations" and plotting an interactive map via **leaflet()**
+
+* Along with the *start_station_name* and its related coordinate columns, *rideable_type* (bike type), and *member_casual* (user type) columns are also grouped to get their distinct occurances, which are to be counted by the summarize() function which produces a separate count column.
+
+* Filtering for 8900 and above occurances is to grab the top 20 occurances according to the grouping. 
+
+* There are 3 stations appear twice in the list, which tallies up the distinct stations to 17 for top 20 occurances. 
+    * *Lake Shore Dr & North Blvd* 
+    * *Streeter Dr & Grand Ave*
+    * *Theater on the Lake*
+
+* The reason these stations appear twice is due to multiple observations in either the *rideable_type* or the *member_casual* column. 
+
+* **Casuals** and **members** are "equally sharing" the top 20 list (10 for each). 
+
+* Both user types preferred *docked* type bikes for their trips in 19 of all 20 occasions. *classic bike* was the "second most" picked type -and only for once- at "*Streeter Dr & Grand Ave*" station by the **casual** users (13,221 times). 
+
+* At the same station (Streeter Dr & Grand Ave) *docked bike* type is the most preferred by again the **casual** users (29,553 times), which is also the number 1 start station among all 17 distinct stations. 
+
+* Below interactive map displays the specific user type(member or casual) for each station when zoomed in enough. Since the **sprintf()** function of the **leaflet** library did not allow for the third label, and that it has already been made clear previously that the vast majority of the bikes are the *docked type*, user types and the count are set as the two labels.
+
+```{r}
+# Getting the top 20 start station occurances: 
+top_start_stations <- all_trips_v3 %>% 
+  group_by(start_station_name, start_lat, start_lng, 
+           rideable_type, member_casual) %>% 
+  summarize(count = n()) %>% 
+  filter(count >= 8900) %>% 
+  arrange(-count, member_casual)
+#tibble(top_start_stations)
+
+# Setting up labels for each point on the map:
+labels <- sprintf("<strong>%s</strong><br/>%s times",
+                  top_start_stations$member_casual, 
+                  prettyNum(top_start_stations$count, big.mark = ",")) %>% 
+  lapply(htmltools::HTML)
+
+# MAPPING:
+chicago_map <- leaflet() %>%  addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+           attribution = paste(
+                         "&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors",
+                         "&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>"
+                       )
+) %>% 
+  addTiles()  %>% 
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView(-87.6298, 41.8781, zoom = 12) %>% 
+  addCircleMarkers(lng = top_start_stations$start_lng, 
+                 lat = top_start_stations$start_lat,
+                 label = labels,
+                 group = top_start_stations$rideable_type,
+                 color  = "white",
+                 opacity = 0.5,
+           clusterOptions =   markerClusterOptions())
+
+chicago_map
+```
+
+#### E6-iv) Determining the most used "end stations" and plotting an interactive map via **leaflet()**
+
+* To get the top 20 occurances for the end stations, this time the filter criteria is set to 8700.
+
+* Like the above *top_start_stations*, there are also end stations with multiple occurances. With an additional station(*Clark St & Elm St*) the number of stations that occur twice in the top end stations list is 4, which totals the distinct end stations to 16:
+    * *Lake Shore Dr & North Blvd* 
+    * *Streeter Dr & Grand Ave*
+    * *Theater on the Lake*
+    * *Clark St & Elm St*
+
+* The reason these stations appear twice is the same as the reason stated for *top_start_stations* dataframe above: due to multiple observations in either the *rideable_type* or the *member_casual* column. 
+
+* **Casuals** appear 11 of the 20 occurances in "10 distinct stations", while the **members** appear 9 of the "8 distinct stations", which means the **casuals** are not just more frequent users in terms of the number of "returned bikes", but in number of the use of distinct stations(10 vs 9) as well. So, the **casuals** returned more bikes to more distinct stations. 
+
+* Both user types returned more *docked* type bikes to the these top end stations. There are 18 docked bike occurances among the 20. 
+
+* The *classic bike* appears twice as the most returned type. Once at "*Streeter Dr & Grand Ave*" station by the **casual** users (13,240 times) and once at *Clark St & Elm St* bu the **members** (8,771 times). Note that the number of times the **casuals** picked the *classic bike* from the "*Streeter Dr & Grand Ave*" station was 13,221, which means the *classic bikes* were returned to different stations by the casuals for 19 times only. 
+
+```{r}
+# Getting the top 20 end station occurances: 
+top_end_stations <- all_trips_v3 %>%
+  group_by(end_station_name, end_lat, end_lng, 
+           rideable_type, member_casual) %>% 
+  summarize(count = n()) %>% 
+  filter(count >= 8700) %>%
+  arrange(-count, member_casual)
+#tibble(top_end_stations)
+
+# Setting up labels for each point on the map:
+labels <- sprintf("<strong>%s</strong><br/>%s times",
+                  top_end_stations$member_casual, 
+                  prettyNum(top_end_stations$count, big.mark = ",")) %>% 
+  lapply(htmltools::HTML)
+
+
+# MAPPING:
+chicago_map2 <- leaflet() %>%  addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+           attribution = paste(
+                         "&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors",
+                         "&copy; <a href=\"http://cartodb.com/attributions\">CartoDB</a>"
+                       )
+) %>% 
+  addTiles()  %>% 
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  setView(-87.6298, 41.8781, zoom = 12) %>% 
+  addCircleMarkers(lng = top_end_stations$end_lng, 
+                 lat = top_end_stations$end_lat,
+                 label = labels,
+                 group = top_end_stations$rideable_type,
+                color  = "white",
+                opacity = 0.5,
+           clusterOptions = markerClusterOptions())
+  
+chicago_map2
+ 
+# Below lines could be run if the notebook doesn't display the map:
+    # htmlwidgets::saveWidget(chicago_map2, "chicago_map2")
+    # display_html('<iframe src="chicago_map2" width=100% height=450></iframe>')                                                                     
+```
+
+## F - References:
+1. [Geocoding with R - Jesse Sadler](https://www.jessesadler.com/post/geocoding-with-r/)
+2. [Intro to Geospatial Mapping in R](https://www.kaggle.com/nulldata/intro-to-geospatial-mapping-in-r-with-leaflet)
+3. [Popups and labels for Leaflet maps](https://rstudio.github.io/leaflet/popups.html)
+4. [Multiple labels for Leaflet maps](https://rstudio.github.io/leaflet/choropleths.html)
+5. [Part of Kevin Hartman's R script](https://docs.google.com/document/d/1TTj5KNKf4BWvEORGm10oNbpwTRk1hamsWJGj6qRWpuI/edit)
+6. [Interactive map display alternative](https://www.kaggle.com/product-feedback/141129)
+7. [Google DA Course5-week2&4: SQL queries on NYC Citibike data for extracting top routes](https://www.coursera.org/learn/analyze-data/home/week/4)
+
+## G - <u>**CONCLUSION**</u>:
+## Summary
+### - **Days:** 
+#### *Weekends*
+* **Casuals** are more frequent riders on **weekends**:
+  * There are roughly 104,000 (**~7%**) more rides taken by the **casuals** on "weekends" than the **members**
+* **Casuals** take much longer rides than **members** do:
+  * "Average ride duration" for **casuals** is more than double the **members'**
+  
+#### *Weekdays*:
+* **Members** took more bike rides in **weekdays**:
+    * **Members** have nearly 704,000 (**24%**) more bike rides in **weekdays**
+    * Their weekday **frequency** based on the **number of rides** is nearly **twice** the percentage the **casuals** have reached.
+* However, **average duration** of the **members** is still far less than the **casuals'**. 
+    * The average duration **gap** (**~25.32 minutes**) between these two user types is "nearly double" the **average duration** amount (**~14.45 minutes**) of the **members**.
+
+### - **Months** 
+* For all three bike types, the **casuals** have 2 peak months; **June** and **July**; 
+    * **classic** and **electric** in **June**, and **docked** in **July**.
+* **Members** on the other hand, have 3 different peak months for each bike type. 
+    * Like the **casuals**, classic bikes are the most preferred in **June**. 
+    * The peaks for the **docked** and **electric** are **August** and **October** respectively.  
+* Similar to the conclusion in the **Days section** above, although leading in **number of rides**, the **members** are far behind the **casuals** in **monthly average durations** as well. 
+    * When both user types at their peak months; 
+        * **classic**: casuals lead by ~13 minutes
+        * **docked**: casuals lead by ~42 minutes
+        * **electric**: casuals lead by ~10 minutes
+
+### - **Key takeaways**: 
+***Members***: 
+   * They lead in **number of rides** in everyday of the **week** except **Saturdays** and **Sundays** 
+   * They are far behind the **casuals** in *ride duration* in each day of the week. 
+   * On the flip side, they are much more active than **casuals** in terms of **number of rides** from **Mondays** to **Fridays**. 
+
+***Casuals***: 
+   * As the **visual E2)** puts, from "**Mondays**" to "**Thursdays**", the **number of rides** they take drops dramatically down to the levels the **members** have never been at. 
+   * They start picking up on **Fridays** and beat the **members** in both **number of rides** and **average durations** on **Saturdays** and **Sundays**.
+   * This means the **casuals** are **weekend** riders.  
+
+### Inferrences and Recommendations: 
+- **Casuals** are likely to be commuters who travel to work mostly from outside the range of the stations: 
+    - This is likely consistent with the **D6-i** chunk that found nearly 6,000 occasions reflecting **single time long travels** which is only a fraction of total number of bike rides outside the set criteria taken by the casuals. 
+    - This may mean, because the **casuals** are mostly from **suburban** areas or are busy commuters in **weekdays** -who have to travel distances outside the station ranges- they tend not to take the bikes with them to their residential areas. 
+    - Should that be the case, a relatively small portion of the **casuals** may be attracted to become **members** by investing in building new stations towards outside the current downtown locations. 
+    - Another supporting find for this judgement is the fact that **electric** bikes are mostly chosen by the **casuals** in **July**, by about 65,000 times, while the peak for the same bike type is a much colder month (**October**) for the **members**, by 60,000 times. 
+         - Considering this narrow gap of number of rides in peak months and their much larger population size, the casuals may have gotten to try **electric** bikes on **weekends** and in the most available month for **leisure**, because only in **weekends** and in the middle of **summer** are they able to travel to the downtown area for **leisure**. 
+    
+- Potential setbacks in the design of an effective marketing strategy: 
+    - Significant percentage of the **casuals** being **tourists**
+        - As **Chicago** is known one of the most famous **tourist** attraction centers in the world, if a significant portion of the casual population being tourists may affect the marketing strategy. Thus, it is recommended to gather additional data about **residential statuses** of the **casual** population, while taking into account the **data ethics**.
+        
+#### Further analysis needed: 
+* **Maps**: 
+    * **End station analysis** by **user** and **bike** types may help curb the **ethics** problem by identifying which bike types returned to which **stations** by the **casuals**. 
+    * **rideable_type column** could not be labeled as the third label layer. Therefore the bike types are not shown when hovered over the top station locations on the map. 
+        
+
